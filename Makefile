@@ -1,4 +1,4 @@
-PROJECT = mongodb
+PROJECT = mongodberl
 
 DIALYZER = dialyzer
 REBAR = $(shell which rebar || echo ./rebar)
