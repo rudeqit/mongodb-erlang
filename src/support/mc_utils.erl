@@ -9,10 +9,6 @@
 -module(mc_utils).
 -author("tihon").
 
--define(ALLOWED_CHARS, {65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
-  90, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-  116, 117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57}).
-
 %% API
 -export([
   get_value/2,
@@ -22,9 +18,10 @@
   pw_hash/2,
   get_timeout/0,
   encode_name/1,
-  random_string/1,
+  random_nonce/1,
   hmac/2,
-  is_proplist/1]).
+  is_proplist/1,
+  to_binary/1]).
 
 get_value(Key, List) -> get_value(Key, List, undefined).
 
@@ -44,13 +41,11 @@ encode_name(Name) ->
   Comma = re:replace(Name, <<"=">>, <<"=3D">>, [{return, binary}]),
   re:replace(Comma, <<",">>, <<"=2C">>, [{return, binary}]).
 
--spec random_string(integer()) -> binary().
-random_string(Length) ->
-  random:seed(os:timestamp()),
-  Chrs = ?ALLOWED_CHARS,
-  ChrsSize = size(Chrs),
-  F = fun(_, R) -> [element(random:uniform(ChrsSize), Chrs) | R] end,
-  lists:foldl(F, "", lists:seq(1, Length)).
+-spec random_nonce(integer()) -> binary().
+random_nonce(TextLength) ->
+	ByteLength = trunc(TextLength / 4 * 3),
+	RandBytes = crypto:strong_rand_bytes(ByteLength),
+	base64:encode(RandBytes).	
 
 value_to_binary(Value) when is_integer(Value) ->
   bson:utf8(integer_to_list(Value));
@@ -74,6 +69,10 @@ pw_key(Nonce, Username, Password) ->
 
 pw_hash(Username, Password) ->
   bson:utf8(binary_to_hexstr(crypto:hash(md5, [Username, <<":mongo:">>, Password]))).
+
+-spec to_binary(string() | binary()) -> binary().
+to_binary(Str) when is_list(Str) ->  list_to_binary(Str);
+to_binary(Str) when is_binary(Str) ->  Str.
 
 
 %% @private
