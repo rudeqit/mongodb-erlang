@@ -11,6 +11,8 @@
   insert/3,
   update/4,
   update/5,
+  update_sync/4,
+  update_sync/5,
   delete/3,
   delete_one/3]).
 -export([
@@ -99,6 +101,20 @@ update(Connection, Coll, Selector, Doc, Args) ->
   Converted = prepare_and_assign(Doc),
   mc_connection_man:request_async(Connection, #update{collection = Coll, selector = Selector,
     updater = Converted, upsert = Upsert, multiupdate = MultiUpdate}).
+
+%% @doc Replace the document matching criteria entirely with the new Document.
+-spec update_sync(pid(), collection(), selector(), bson:document()) -> {non_neg_integer(), [bson:document()]}.
+update_sync(Connection, Coll, Selector, Doc) ->
+  update_sync(Connection, Coll, Selector, Doc, []).
+
+%% @doc Replace the document matching criteria entirely with the new Document.
+-spec update_sync(pid(), collection(), selector(), bson:document(), proplists:proplist()) -> {non_neg_integer(), [bson:document()]}.
+update_sync(Connection, Coll, Selector, Doc, Args) ->
+  Upsert = mc_utils:get_value(upsert, Args, false),
+  MultiUpdate = mc_utils:get_value(multi, Args, false),
+  Converted = prepare_and_assign(Doc),
+  mc_connection_man:request_async(Connection, {sync, #update{collection = Coll, selector = Selector,
+    updater = Converted, upsert = Upsert, multiupdate = MultiUpdate}}).
 
 %% @doc Delete selected documents
 -spec delete(pid(), collection(), selector()) -> ok.

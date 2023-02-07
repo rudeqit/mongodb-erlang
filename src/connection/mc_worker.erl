@@ -52,6 +52,19 @@ handle_call(#ensure_index{collection = Coll, index_spec = IndexSpec}, _, State =
   {ok, _} = mc_worker_logic:make_request(Socket, ConnState#conn_state.database,
     #insert{collection = <<"system.indexes">>, documents = [Index]}),
   {reply, ok, State};
+handle_call({sync, Request}, _, State = #state{socket = Socket, conn_state = ConnState = #conn_state{}})
+  when is_record(Request, insert); is_record(Request, update); is_record(Request, delete) -> % write requests
+  Params = {},
+  ConfirmWrite = #'query'{ % check-write read request
+    batchsize = -1,
+    collection = <<"$cmd">>,
+    selector = bson:append({<<"getlasterror">>, 1}, Params)
+  },
+  inet:setopts(Socket, [{active, false}]),
+  {ok, Id} = mc_worker_logic:make_request(Socket, ConnState#conn_state.database, [Request, ConfirmWrite]), % ordinary write request
+  Response = receive_response(Id, Socket),
+  inet:setopts(Socket, [{active, true}]),
+  {reply, Response, State};
 handle_call(Request, From, State = #state{socket = Socket, conn_state = ConnState = #conn_state{}, request_storage = ReqStor})
   when is_record(Request, insert); is_record(Request, update); is_record(Request, delete) -> % write requests
   case ConnState#conn_state.write_mode of
@@ -128,4 +141,18 @@ try_register(Options) ->
     false -> ok;
     {_, Name} when is_atom(Name) -> register(Name, self());
     {_, RegFun} when is_function(RegFun) -> RegFun(self())
+  end.
+
+receive_response(Id, Socket) ->
+  Timeout = mc_utils:get_timeout(),
+  {ok, Packet} = gen_tcp:recv(Socket, 0, Timeout),
+
+  {Responses, _} = mc_worker_logic:decode_responses(Packet),
+  {ReqestId, Reply} = hd(Responses),
+
+  case ReqestId of
+    Id ->
+      Reply;
+    _ ->
+      receive_response(Id, Socket)
   end.
