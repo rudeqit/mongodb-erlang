@@ -85,7 +85,7 @@ take(Cursor, Limit, Timeout) ->
   end.
 
 cursor_default_timeout() ->
-  application:get_env(mongodb, cursor_timeout, infinity).
+  application:get_env(mongodberl, cursor_timeout, infinity).
 
 -spec foldl(fun((bson:document(), term()) -> term()), term(), pid(), non_neg_integer() | infinity) -> term().
 foldl(Fun, Acc, Cursor, Max) ->
